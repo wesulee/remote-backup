@@ -11,8 +11,8 @@ class Server(object):
     '''all interactions with server use this class'''
     def __init__(self):
         self.serverBase = 'http://localhost/server/'
-        self.actions = {'ufi':'upload_file.php', 'df':'download_file.php',
-                        'ufo':'upload_folder.php'}
+        self.maxUploadSize = 1024 * 1024 * 2
+        self.actions = {'ufi':'upload_file.php', 'df':'download_file.php'}
 
     def actionURL(self, action):
         '''generates the url for an action'''
@@ -20,11 +20,38 @@ class Server(object):
 
     def uploadFile(self, f):
         '''Upload a file using POST'''
+        if f.size > self.maxUploadSize:
+            return self.multiUploadFile(f)
         url = self.actionURL('ufi')
-        files = {'file': (f.path, open(f.path, 'rb'))}
-        payload = {'full_path': f.formatUploadPath()}
+        files = {'file':(f.path, open(f.path, 'rb'))}
+        payload = {'full_path':f.fpath}
         r = requests.post(url, files=files, data=payload)
         return r.text
+
+    def multiUploadFile(self, f):
+        '''upload a file that exceeds the server limit'''
+        url = self.actionURL('ufi')
+        defaultPayload = {'full_path':f.fpath, 'multi':1}
+        part = 1
+        if f.size % self.maxUploadSize == 0:
+            endPart = f.size / self.maxUploadSize
+        else:
+            endPart = f.size / self.maxUploadSize + 1
+        F = open(f.path, 'rb')
+        chunk = F.read(self.maxUploadSize)
+        while chunk:
+            files = {'file':(f.path, chunk)}
+            payload = {'part':part}
+            payload.update(defaultPayload)
+            if part == endPart:
+                payload['last'] = 1
+            r = requests.post(url, files=files, data=payload)
+            if part == endPart:
+                F.close()
+                return
+            else:
+                part += 1
+                chunk = F.read(self.maxUploadSize)
     
     def downloadFile(self, localPath, remotePath):
         '''download url from server to localPath'''
@@ -45,7 +72,7 @@ class Server(object):
             else:
                 print 'Folder does not exist'
             return
-        url = self.actionURL('ufo')
+        url = self.actionURL('ufi')
         files = allFiles(folderPath)
         for filePath in files:
             self.uploadFile(File(filePath))
@@ -53,7 +80,11 @@ class Server(object):
 
 class File(object):
     def __init__(self, path):
-        self.path = path
+        self.path = path                        # local path
+        self.fpath = self.formatUploadPath()    # path used for server
+        fileInfo = os.stat(path)
+        self.size = fileInfo.st_size            # file size in bytes
+        self.modified = fileInfo.st_mtime       # modified time
 
     def formatUploadPath(self):
         '''correct path for full_path parameter when uploading'''
@@ -83,7 +114,3 @@ def indexExclude(string, excludeString):
         if c not in excludeSet:
             return i
     return -1
-
-
-
-
