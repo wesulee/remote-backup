@@ -4,33 +4,45 @@ Python client for remote backup
 import os
 import requests
 import itertools
-
+import json
 
 
 class Server(object):
-    '''all interactions with server use this class'''
+    '''All interactions with server use this class'''
     def __init__(self):
-        self.serverBase = 'http://localhost/server/'
+        self.server = 'http://localhost/server/api/api.php'
         self.maxUploadSize = 1024 * 1024 * 2
-        self.actions = {'ufi':'upload_file.php', 'df':'download_file.php'}
+        self.timeout = 5    # seconds for connection process
+        self.authenticate()
 
-    def actionURL(self, action):
-        '''generates the url for an action'''
-        return self.serverBase + self.actions[action]
+    def do(self, action, files=None, data={}, stream=False):
+        '''Execute the action'''
+        data['action'] = action
+        prepped = requests.Request('POST', self.server, files=files,
+                                   data=data, cookies=self.s.cookies).prepare()
+        resp = self.s.send(prepped, stream=stream, verify=False,
+                           timeout=self.timeout)
+        return resp
+
+    def authenticate(self):
+        self.s = requests.Session()
+        payload = {'username':'test1', 'password':'test123'}
+        r = self.do('authenticate', data=payload)
+        resp = self.decodeResponse(r.text)
+        if 'error' in resp:
+            raise 'AuthenticationError'
 
     def uploadFile(self, f):
         '''Upload a file using POST'''
         if f.size > self.maxUploadSize:
             return self.multiUploadFile(f)
-        url = self.actionURL('ufi')
         files = {'file':(f.path, open(f.path, 'rb'))}
         payload = {'full_path':f.fpath}
-        r = requests.post(url, files=files, data=payload)
+        r = self.do('uploadfile', files=files, data=payload)
         return r.text
 
     def multiUploadFile(self, f):
-        '''upload a file that exceeds the server limit'''
-        url = self.actionURL('ufi')
+        '''Upload a file that exceeds the server limit'''
         defaultPayload = {'full_path':f.fpath, 'multi':1}
         part = 1
         if f.size % self.maxUploadSize == 0:
@@ -45,20 +57,23 @@ class Server(object):
             payload.update(defaultPayload)
             if part == endPart:
                 payload['last'] = 1
-            r = requests.post(url, files=files, data=payload)
+            r = self.do('multiuploadfile', files=files, data=payload)
+            resp = self.decodeResponse(r.text)
+            if 'error' in resp:
+                return resp
             if part == endPart:
                 F.close()
-                return
+                return resp
             else:
                 part += 1
                 chunk = F.read(self.maxUploadSize)
     
     def downloadFile(self, localPath, remotePath):
         '''download url from server to localPath'''
-        url = self.actionURL('df')
         with open(localPath, 'wb') as f:
-            payload = {'path': remotePath}
-            req = requests.get(url, params=payload, stream=True)
+            payload = {'action':'downloadfile', 'path': remotePath}
+            req = requests.post(self.server, data=payload, stream=True,
+                               cookies=self.s.cookies)
             for block in req.iter_content(1024 * 100):
                 if not block:
                     break
@@ -72,10 +87,12 @@ class Server(object):
             else:
                 print 'Folder does not exist'
             return
-        url = self.actionURL('ufi')
-        files = allFiles(folderPath)
-        for filePath in files:
+        for filePath in allFiles(folderPath):
             self.uploadFile(File(filePath))
+
+    def decodeResponse(self, response):
+        '''deserialize JSON string'''
+        return json.loads(response)
 
 
 class File(object):
@@ -90,6 +107,9 @@ class File(object):
         '''correct path for full_path parameter when uploading'''
         path = self.path.replace('\\', '/')
         return path[indexExclude(path, '/'):]
+
+    def __str__(self):
+        return 'Filepath: '+self.path
 
 
 class RootFolder(object):
