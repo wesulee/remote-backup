@@ -1,5 +1,5 @@
 <?php
-require_once('/../setup/db_setup_variables.php');
+require_once('../setup/db_setup_variables.php');
 
 // user registration settings
 // NULL to default to table schema
@@ -8,7 +8,6 @@ $maxUsername = NULL;
 $minPassword = 6;
 $maxPassword = 100;
 
-// registration
 // choose whether to allow new registrations
 $allowRegister = true;
 

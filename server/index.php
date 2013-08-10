@@ -1,5 +1,6 @@
 <?php
 require_once('includes/db.php');
+require_once('includes/helper_functions.php');
 session_start();
 
 ?>
@@ -9,33 +10,21 @@ session_start();
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>Remote Backup</title>
 </head>
-
 <body>
+<?php
+if ($_SESSION['auth'] === 1) { ?>
+	<p>You are logged in as <?php echo $_SESSION['username'] ?></p>
+	<p><a href="browse.php">Browse files</a></p>
+<?php 
+}
+else { ?>
 <h3>Login</h3>
-<form action="index.php" method="post">
+<form action="login.php" method="post">
 	Username <input name="username" type="text" value="" /><br>
 	Password <input name="password" type="password" value="" /><br>
 	<input name="Submit" type="submit" />
 </form>
 <p><a href="register.php">Register here</a></p>
-<?php
-// check if logged in
-if ($_SESSION['auth'] === 1) {
-	echo "You are logged in as {$_SESSION['username']}";
-	exit();
-}
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-	$db = new DB();
-	if ($db->validLogin($_POST['username'], $_POST['password'])) {
-		// set session stuff here
-		echo 'Valid user';
-	}
-	else {
-		echo 'Wrong login information';
-	}
-}
-
-?>
+<?php } ?>
 </body>
 </html>

@@ -1,12 +1,13 @@
 <?php
+require_once('includes/path_variables.php');
 require_once('includes/user_variables.php');
+require_once('includes/helper_functions.php');
 require_once('includes/db.php');
 session_start();
 
 // redirect to index if already logged in
 if ($_SESSION['auth'] === 1) {
-	header('Location: index.php');
-	exit();
+	redirect('index.php', true);
 }
 
 // validates username, returns NULL if acceptable username
@@ -73,8 +74,7 @@ function checkEmailError($email, $allowEmpty)
 
 // immediately redirect if not allowed or register or request wasn't POST
 if (!$allowRegister || $_SERVER['REQUEST_METHOD'] !== 'POST') {
-	header('Location: index.php');
-	exit();
+	redirect('index.php', true);
 }
 
 // store info in session, so able to resume registration if error
@@ -87,11 +87,11 @@ $errors = array(
 	checkPasswordError($_POST['password']),
 	checkEmailError($_POST['email'], $emailOptional)
 	);
+
 foreach ($errors as $error) {
 	if (!is_null($error)) {
 		$_SESSION['register_error'] = $error;
-		header('Location: register.php');
-		exit();
+		redirect('register.php');
 	}
 }
 
@@ -99,15 +99,12 @@ $db = new DB();
 if ($db->registerUser($_POST['username'], $_POST['password'],
 	$emailOptional && empty($_POST['email']) ? NULL : $_POST['email'])) {
 	// registration successful
+
 	$_SESSION['register_notice'] = 'User successfully registered! Please login.';
-	header('Location: index.php');
+	redirect('index.php');
 }
 else {
 	// database error
 	$_SESSION['register_error'] = 'An unexpected error has occurred. Please try again.';
-	header('Location: register.php');
-	exit();
+	redirect('register.php');
 }
-
-
-?>

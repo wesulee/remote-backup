@@ -5,15 +5,20 @@ import os
 import requests
 import itertools
 import json
+import ConfigParser
 
 
 class Server(object):
     '''All interactions with server use this class'''
     def __init__(self):
-        self.server = 'http://localhost/server/api/api.php'
+        config = ConfigParser.ConfigParser()
+        config.read('client_settings.ini')
+        
+        self.server = config.get('server', 'address')
         self.maxUploadSize = 1024 * 1024 * 2
         self.timeout = 5    # seconds for connection process
-        self.authenticate()
+        self.authenticate(config.get('auth', 'username'),
+                          config.get('auth', 'password'))
 
     def do(self, action, files=None, data={}, stream=False):
         '''Execute the action'''
@@ -24,9 +29,9 @@ class Server(object):
                            timeout=self.timeout)
         return resp
 
-    def authenticate(self):
+    def authenticate(self, username, password):
         self.s = requests.Session()
-        payload = {'username':'test1', 'password':'test123'}
+        payload = {'username':username, 'password':password}
         r = self.do('authenticate', data=payload)
         resp = self.decodeResponse(r.text)
         if 'error' in resp:

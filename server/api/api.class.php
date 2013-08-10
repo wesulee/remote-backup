@@ -1,5 +1,5 @@
 <?php
-require_once('../includes/variables.php');
+require_once('../includes/path_variables.php');
 class API
 {
 	protected $user;
@@ -21,8 +21,6 @@ class API
 
 	public function uploadfile($FILES, $POST)
 	{
-
-
 		$response = array('action' => 'uploadfile');
 
 		if (!isset($FILES['file'])) {
